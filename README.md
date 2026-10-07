@@ -8,6 +8,10 @@
 **Copilot으로 개발 → GitHub에서 협업 → Actions로 검증 → Azure 배포 → 관측과 롤백**을 하나의 흐름으로 학습합니다.
 먼저 Ch.0~9로 필요한 기술을 익히고, Ch.10에서 전체 과정을 하나의 프로젝트로 연결합니다.
 
+**Track 2·3에서 첫 배포를 경험했다면:** [트랙 연결 가이드](docs/track2-track3-bridge.md)를 통해
+자신의 MSA·정적 웹·Python 앱에 자동화·승인·관측·롤백을 붙입니다.
+Track 2·3은 첫 배포, 이 Track 4는 반복 가능한 배포와 운영 체계를 목표로 하며 기존 독립 수강 경로도 유지합니다.
+
 ### 1. 챕터별 학습 경로
 
 ```mermaid
@@ -36,8 +40,10 @@ flowchart TD
     C9["Ch.9 보안 · 모니터링 · 롤백<br/>GHAS · Key Vault · App Insights"]
     C10["Ch.10 Capstone<br/>MiniLinkr 프로젝트로 전 과정 통합"]
     Done["산출물<br/>작동하는 웹앱 · CI/CD · 운영 가이드"]
+    Prior["Track 2·3 배포 결과물<br/>환경·권한·검증 기준 재확인"]
 
     Prep --> C1
+    Prior -.->|선수 역량 확인 후| C5
     C4 --> C5
     C8 --> C9 --> C10 --> Done
 
