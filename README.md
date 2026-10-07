@@ -3,6 +3,89 @@
 > **개발자를 위한 GitHub Copilot 심화 커리큘럼 — 코딩부터 리포 관리, Azure 배포 자동화까지**
 > 이론 20% + 실습 80% · 한국어 · 챕터당 30~60분
 
+## 전체 교육 flow
+
+**Copilot으로 개발 → GitHub에서 협업 → Actions로 검증 → Azure 배포 → 관측과 롤백**을 하나의 흐름으로 학습합니다.
+먼저 Ch.0~9로 필요한 기술을 익히고, Ch.10에서 전체 과정을 하나의 프로젝트로 연결합니다.
+
+### 1. 챕터별 학습 경로
+
+```mermaid
+---
+config:
+  theme: neutral
+  flowchart:
+    wrappingWidth: 320
+---
+flowchart TD
+    Prep["Ch.0 사전 준비<br/>GitHub · Copilot · Azure · 개발 환경"]
+    subgraph Coding["Copilot 활용과 팀 개발 · Ch.1~4"]
+        C1["Ch.1 Copilot 소개 · 시작하기"]
+        C2["Ch.2 실전 코딩<br/>Chat · Inline · Edit · Agent"]
+        C3["Ch.3 고급 활용<br/>Instructions · Custom Agents · MCP"]
+        C4["Ch.4 리포지토리 관리<br/>브랜치 · PR · Code Owners"]
+        C1 --> C2 --> C3 --> C4
+    end
+    subgraph Delivery["CI/CD와 Azure 배포 · Ch.5~8"]
+        C5["Ch.5 Actions 기초<br/>Workflow · Matrix · 재사용"]
+        C6["Ch.6 Azure 배포 기초<br/>서비스 선택 · OIDC 인증"]
+        C7["Ch.7 Actions × Azure<br/>환경 분리 · 통합 CI/CD"]
+        C8["Ch.8 실전 웹앱 배포<br/>App Service · ACR · Container Apps"]
+        C5 --> C6 --> C7 --> C8
+    end
+    C9["Ch.9 보안 · 모니터링 · 롤백<br/>GHAS · Key Vault · App Insights"]
+    C10["Ch.10 Capstone<br/>MiniLinkr 프로젝트로 전 과정 통합"]
+    Done["산출물<br/>작동하는 웹앱 · CI/CD · 운영 가이드"]
+
+    Prep --> C1
+    C4 --> C5
+    C8 --> C9 --> C10 --> Done
+
+    classDef step fill:#eaf5fa,stroke:#096f88,color:#162b46
+    classDef result fill:#eaf6f0,stroke:#15745b,color:#162b46
+    class Prep,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10 step
+    class Done result
+```
+
+챕터 문서와 소요 시간: [챕터 지도](#-챕터-지도)
+
+### 2. Capstone에서 완성하는 개발·배포 흐름
+
+```mermaid
+---
+config:
+  theme: neutral
+  flowchart:
+    wrappingWidth: 320
+---
+flowchart TD
+    Plan["Sprint 1 · Issue → 브랜치<br/>요구사항 · 작업 계획"]
+    Code["Sprint 2 · Copilot 개발<br/>코드 · 테스트 · PR"]
+    CI["Sprint 3 · CI 검증<br/>빌드 · 테스트 · GHAS"]
+    Pass{"CI 기준 통과?"}
+    Infra["Sprint 4 · Azure 프로비저닝<br/>Bicep · 환경 구성"]
+    Deploy["Sprint 5 · CD<br/>OIDC · 환경별 배포 승인"]
+    Observe["Sprint 6 · 관측<br/>Application Insights · KQL"]
+    Healthy{"서비스 정상?"}
+    Rollback["이전 버전으로 롤백<br/>원인 분석 · 코드 또는 설정 수정"]
+    Retro["Sprint 7 · 회고<br/>문서화 · 시연 · 개선 계획"]
+
+    Plan --> Code --> CI --> Pass
+    Pass -->|실패| Code
+    Pass -->|통과| Infra --> Deploy --> Observe --> Healthy
+    Healthy -->|이상 감지| Rollback --> Code
+    Healthy -->|정상| Retro
+
+    classDef step fill:#eaf5fa,stroke:#096f88,color:#162b46
+    classDef gate fill:#fbf4e7,stroke:#926020,color:#162b46
+    classDef result fill:#eaf6f0,stroke:#15745b,color:#162b46
+    class Plan,Code,CI,Infra,Deploy,Observe,Rollback step
+    class Pass,Healthy gate
+    class Retro result
+```
+
+실습 가이드: [Ch.10 종합 실습 Capstone](docs/ch10_종합_실습_Capstone.md)
+
 ---
 
 ## 이 커리큘럼이 필요한 이유
