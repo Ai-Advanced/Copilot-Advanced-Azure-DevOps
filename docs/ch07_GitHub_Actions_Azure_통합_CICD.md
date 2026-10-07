@@ -129,6 +129,14 @@ Ch.6에서 Azure Portal 또는 Azure CLI로 Federated Credential을 이미 만�
 
 ### 3-1. Subject 클레임 패턴 비교
 
+> **현재 저장소의 실제 subject를 먼저 확인하세요.** 아래 이름 기반 패턴은 개념 예시입니다.
+> Immutable subject를 사용하는 저장소는 `repo:owner@123/repository@456:environment:production`처럼
+> 고정 ID가 포함됩니다. `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`의
+> `use_default`, `use_immutable_subject`, `sub_claim_prefix`와 로그인 로그의 subject를 확인합니다.
+> 토큰 원문은 출력하지 않습니다. 맞춤 claim은 조직 관리자와 확인하며 Azure 신뢰를 정확히 일치시킵니다.
+> Environment subject에는 브랜치 제한이 자동 포함되지 않으므로 Environment 배포 브랜치 정책도 설정합니다.
+> [실행 예제와 준비 절차](../examples/01-web-app/README.md)를 함께 사용하세요.
+
 | Subject 클레임 | 언제 매칭되나 | 추천 용도 |
 |---|---|---|
 | `repo:owner/repo:environment:production` | `environment: production` 이 지정된 Job | Production 배포 전용 |

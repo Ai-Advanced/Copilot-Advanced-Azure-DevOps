@@ -1,0 +1,22 @@
+{
+  "name": "copilot-slot-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Synthetic Chapter 8 API for isolated Azure deployment exercises",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "jest --runInBand --coverage",
+    "lint": "eslint src tests scripts"
+  },
+  "engines": { "node": ">=22.13.0" },
+  "dependencies": {
+    "express": "4.22.3",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "eslint": "10.12.0",
+    "jest": "30.5.2",
+    "supertest": "7.3.1"
+  }
+}

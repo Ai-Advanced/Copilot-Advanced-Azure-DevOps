@@ -1,0 +1,193 @@
+name: Azure slot lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+        required: true
+        description: Deploy current source or restore the verified staging version
+      rollback_version:
+        type: string
+        description: Required for rollback, e.g. 1.0.0
+      bootstrap:
+        type: boolean
+        default: false
+        description: Instructor-confirmed first deployment to an empty app; no previous release to restore
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-slot-lab
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    defaults:
+      run:
+        working-directory: examples/01-web-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: examples/01-web-app/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm test -- --silent
+      - id: version
+        env:
+          OPERATION: ${{ inputs.operation }}
+          ROLLBACK_VERSION: ${{ inputs.rollback_version }}
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+        run: |
+          if [ "$OPERATION" = "rollback" ] && [ "$BOOTSTRAP" = "true" ]; then
+            echo "::error::Rollback cannot bootstrap an empty application."
+            exit 1
+          fi
+          node -e "const fs=require('fs'); const v=process.env.OPERATION==='rollback'?process.env.ROLLBACK_VERSION:require('./package.json').version; if(!/^\d+\.\d+\.\d+$/.test(v)) throw Error('Invalid expected version'); fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+'\n');"
+      - name: Package once with Linux production dependencies
+        if: inputs.operation == 'deploy'
+        run: |
+          npm ci --omit=dev --no-audit --no-fund
+          zip -qr deploy.zip src node_modules package.json package-lock.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: inputs.operation == 'deploy'
+        with:
+          name: app-package
+          path: examples/01-web-app/deploy.zip
+          retention-days: 1
+
+  staging:
+    if: inputs.operation == 'deploy'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: lab-staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CORE_OUTPUT: none
+      AZURE_CORE_ONLY_SHOW_ERRORS: 'true'
+      GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      APP: ${{ secrets.AZURE_WEBAPP_NAME }}
+      SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: app-package
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        env:
+          AZURE_CORE_OUTPUT: json
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Confirm staging identity cannot write production settings
+        shell: bash
+        run: |
+          set +e
+          az webapp config appsettings set --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" \
+            --settings LAB_BOUNDARY_PROBE=denied >boundary.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "::error::Staging identity unexpectedly wrote production. Instructor must remove the probe setting and correct RBAC."
+            exit 1
+          fi
+          grep -q "AuthorizationFailed" boundary.log || { cat boundary.log; exit 1; }
+          echo "PASS: production write denied by Azure RBAC."
+      - name: Deploy exactly the tested package
+        run: az webapp deploy --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" --slot staging --type zip --src-path deploy.zip
+      - name: Verify staging behavior and release
+        env:
+          EXPECTED_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          host=$(az webapp show --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" --slot staging --query defaultHostName -o tsv)
+          echo "::add-mask::$host"
+          node examples/01-web-app/scripts/smoke.cjs "https://$host" "$EXPECTED_VERSION"
+
+  production:
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.staging.result == 'success' || inputs.operation == 'rollback') }}
+    needs: [build, staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: lab-production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CORE_OUTPUT: none
+      AZURE_CORE_ONLY_SHOW_ERRORS: 'true'
+      GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      APP: ${{ secrets.AZURE_WEBAPP_NAME }}
+      SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      EXPECTED_VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        env:
+          AZURE_CORE_OUTPUT: json
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Inspect target and record the current release
+        id: before
+        shell: bash
+        env:
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          production=$(az webapp show --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" --query defaultHostName -o tsv)
+          staging=$(az webapp show --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" --slot staging --query defaultHostName -o tsv)
+          echo "::add-mask::$production"
+          echo "::add-mask::$staging"
+          echo "PRODUCTION_ORIGIN=https://$production" >> "$GITHUB_ENV"
+          node examples/01-web-app/scripts/smoke.cjs "https://$staging" "$EXPECTED_VERSION"
+          if [ "$OPERATION" = "rollback" ]; then
+            echo "Approved recovery to the verified staging release; current production need not be healthy."
+            exit 0
+          fi
+          status=$(curl --silent --show-error --max-time 90 -o previous.json -w '%{http_code}' "https://$production/health")
+          if [ "$status" = "200" ] && jq -e '.status == "ok" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' previous.json >/dev/null 2>&1; then
+            if [ "$BOOTSTRAP" = "true" ]; then
+              echo "::error::An existing release cannot be treated as an empty bootstrap target."
+              exit 1
+            fi
+            echo "version=$(jq -r .version previous.json)" >> "$GITHUB_OUTPUT"
+          elif [ "$BOOTSTRAP" = "true" ] && { [ "$status" = "200" ] || [ "$status" = "404" ] || [ "$status" = "503" ]; }; then
+            echo "::warning::Explicit first deployment to the empty training app; no previous release can be restored."
+          else
+            echo "::error::Current production is unhealthy; inspect it before changing traffic."
+            exit 1
+          fi
+      - name: Swap the verified staging package
+        id: swap
+        run: az webapp deployment slot swap --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" --slot staging --target-slot production
+      - name: Verify production behavior and release
+        run: node examples/01-web-app/scripts/smoke.cjs "$PRODUCTION_ORIGIN" "$EXPECTED_VERSION"
+      - name: Restore the previous verified release after failed validation
+        if: ${{ failure() && steps.swap.outcome == 'success' && steps.before.outputs.version != '' }}
+        env:
+          PREVIOUS_VERSION: ${{ steps.before.outputs.version }}
+        run: |
+          az webapp deployment slot swap --subscription "$SUBSCRIPTION" -g "$GROUP" -n "$APP" --slot staging --target-slot production
+          node examples/01-web-app/scripts/smoke.cjs "$PRODUCTION_ORIGIN" "$PREVIOUS_VERSION"
+          echo "::error::The previous version was restored; the attempted release remains failed."

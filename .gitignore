@@ -79,3 +79,5 @@ logs/
 .cache/
 tmp/
 temp/
+examples/01-web-app/*.zip
+*.local.json

@@ -92,6 +92,10 @@ flowchart TD
 
 실습 가이드: [Ch.10 종합 실습 Capstone](docs/ch10_종합_실습_Capstone.md)
 
+실행 가능한 대표 배포 경로: [Ch.7~9 App Service 슬롯 실습](examples/01-web-app/README.md).
+소스·테스트·Bicep·수동 Actions 워크플로로 OIDC·실패 차단·승인·배포·롤백을 연습합니다.
+MiniLinkr 전체 또는 모든 Azure 배포 방식의 검증을 대신하지 않습니다.
+
 ---
 
 ## 이 커리큘럼이 필요한 이유
@@ -169,7 +173,7 @@ GitHub Copilot을 "코드 자동완성 도구" 정도로만 알고 계신가요?
 - [ ] Git 2.40+ 로컬 설치
 - [ ] Azure 구독 (신규 가입 시 $200 크레딧 · 30일)
 - [ ] Azure CLI 2.60+ 설치 (`az --version` 확인)
-- [ ] Node.js 20 LTS 또는 Python 3.11+ (실습 예제 언어에 맞춰 선택)
+- [ ] Node.js 22.13+ 또는 Python 3.11+ (실습 예제 언어·Azure 지원 런타임에 맞춰 선택)
 
 **권장**
 
@@ -229,12 +233,12 @@ Copilot-Advanced-Azure-DevOps/
 │   ├── ch09_보안_모니터링_롤백.md
 │   └── ch10_종합_실습_Capstone.md
 ├── examples/                                    # 실습용 샘플 프로젝트
-│   ├── 01-web-app/                              # App Service 배포 예제
-│   └── 02-container-app/                        # Container Apps 배포 예제
+│   └── 01-web-app/                              # 실행 가능한 App Service 슬롯 예제
 ├── .github/
-│   └── workflows/                               # 예시 CI/CD 워크플로우
-└── assets/                                      # 다이어그램, 이미지
+│   └── workflows/azure-slot-lab.yml              # 수동 실행 · 승인 · 버전 검증 · 롤백
 ```
+
+Container Apps와 MiniLinkr는 챕터 안의 코드·과제로 구성하며 완성 앱 디렉터리가 제공된 것으로 가정하지 않습니다.
 
 ---
 
